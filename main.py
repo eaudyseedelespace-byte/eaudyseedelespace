@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import math
 
-#h = 0.01
+
 h = 0.0001# Pas de temps pour l'intégration
 v = [0]  # Liste des valeurs de y (commence avec y0)
 x = [0]  #liste des valeurs de x ( positino)
@@ -37,14 +37,16 @@ def f_m(t, m, dm_dt):  # la masse en fonction du temps
 
 
 def f_v_1(t, dm_dt, ve, mf, me, g, v_courant):
+#équation de Tsiolkovski sans parachute, diamètre de la bouteille, force de trainée négative
     thrust = -dm_dt * ve
     Fd = 0.5 * Cd * rho_air * (v_courant ** 2) * Afr
-    return ((thrust - (Fd) - (mf + me) * g)) / (mf + me)  # dérivée de la vitesse (accélération)
+    return ((thrust - (Fd) - (mf + me) * g)) / (mf + me)
 
 def f_v_2(t, dm_dt, ve, mf, me, g, v_courant):
+# équation de Tsiolkovski avec parachute, diamètre du parachute, force de trainée positive
     thrust = -dm_dt * ve
     Fd = 0.5 * Cd * rho_air * (v_courant ** 2) * Aparachute
-    return ((thrust + (Fd) - (mf + me) * g)) / (mf + me)  # dérivée de la vitesse (accélération)
+    return ((thrust + (Fd) - (mf + me) * g)) / (mf + me)
 
 '''-------------La Fonction Euler -------------------'''
 
@@ -58,8 +60,10 @@ def euler(t, v, h, dm_dt, ve, mf, me, g, ):
         sup = (1.5e-3) - (me[0]) / rho_eau  #
         inf = (1.5e-3) - (me[-1]) / rho_eau
 
-        Pt = P0 * (sup / inf) ** 1.4  # calcul de la pression en fonction du temps
-        if me[-1] <= 0 or Pt <= Pext:  # temps que la masse d'eau est superieur à 0
+    # calcul de la pression en fonction du temps
+        Pt = P0 * (sup / inf) ** 1.4
+    # temps que la masse d'eau est superieur à 0 et la
+        if me[-1] <= 0 or Pt <= Pext:
             dm_dt = 0
             ve = 0
         else:
@@ -68,19 +72,25 @@ def euler(t, v, h, dm_dt, ve, mf, me, g, ):
         dme = f_m(t, me[-1], dm_dt)  # retourne le début massique de l'eau
         dx = f_x(t, x[-1], v[-1])  # retourne la vitesse [-1]
         if v[-1] >=0:
+            # La vitesse est positive, le parachute n'est pas deployé
             dv = f_v_1(t, dm_dt, ve, mf, me[-1], g, v[-1])
         else:
+            # la vitesse est négative, le parachute est déployé
             dv = f_v_2(t, dm_dt, ve, mf, me[-1], g, v[-1])
 
+    # La masse d'eau suivante c'est celle d'avant + la dérivée * h
+        me_next = me[-1] + dme * h
+    # La vitesse suivante c'est la vitesse d'avant + la dérivée * h
+        v_next = v[-1] + dv * h
+    # La position suivante c'est la position d'avant + la dérivée * h
+        x_next = x[-1] + dx * h
 
-        me_next = me[-1] + dme * h  # La masse d'eau suivante c'est celle d'avant + la dérivée * h
-        v_next = v[-1] + dv * h  # La vitesse suivante c'est la vitesse d'avant + la dérivée * h
-        x_next = x[-1] + dx * h  # La position suivante c'est la position d'avant + la dérivée * h
-
-
-        x.append(x_next)  # On rajoue la nouvelle valeur à la liste x ( la position de la fusée)
-        v.append(v_next)  # On rajoue la nouvelle valeur à la liste v ( la vitesse de la fusée
-        me.append(me_next)  # On rajoue la nouvelle valeur à la liste me ( la masse d'eau )
+    # On rajoue la nouvelle valeur à la liste x ( la position de la fusée)
+        x.append(x_next)
+    # On rajoue la nouvelle valeur à la liste v ( la vitesse de la fusée
+        v.append(v_next)
+    # On rajoue la nouvelle valeur à la liste me ( la masse d'eau )
+        me.append(me_next)
 
 
         if x_next < 0:  # si la position est inferieur à 0, on arrête le code
@@ -102,6 +112,7 @@ def main():
         v = [0]
         me = [0.01 * i]
         resultat_x, resultat_v, resultat_m = euler(0, v, h, dm_dt, ve, mf, me, g)
+        # On fait une liste avec toutes les hauteurs max pour trouver au final le max des hauteur max
         hauteur_max_absolue.append(max(resultat_x))
         if h_max - 0.3 < max(resultat_x) <= h_max + 0.3:
             print(max(resultat_x))
@@ -149,6 +160,8 @@ def main():
 
             plt.tight_layout()
             plt.show()
+
+    # la hauteur max absolue est la plus grande hauteur dans la liste des hauteurs max
     hauteur_max = max(hauteur_max_absolue)
     print("La hauteur absolue est ", hauteur_max)
 
@@ -157,3 +170,4 @@ if __name__ == "__main__":
     main()
     # resultat_x, resultat_v, resultat_m = euler(0, v, h, dm_dt, ve, mf, me, g)
     # print("Hauteur maximale atteinte :", max(resultat_x), "m")
+
