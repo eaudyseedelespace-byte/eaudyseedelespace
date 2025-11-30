@@ -4,16 +4,16 @@ import math
 
 h = 0.0001# Pas de temps pour l'intégration
 v = [0]  # Liste des valeurs de y (commence avec y0)
-x = [0]  #liste des valeurs de x ( positino)
+x = [0]  #liste des valeurs de x ( position)
 g = 9.81  # Accélération due à la gravité (m/s²)     # Masse initiale de la fusée (kg)
 
-Pajouté = 500000  # Pression ajoutée en Pa
+Pajouté = 400000  # Pression ajoutée en Pa
 Pext = 101325
 P0 = Pext + Pajouté
 Ae = 0.00005  # surface de la bouche d'éjection m2
 Pt = 0  # pression qui change en fonction du temps
 dm_dt = 0  # débit massique de l'eau
-ve = 0  # equation de bernouilli
+ve = 0  # vitesse d'éjection
 Cd = 0.76
 rho_eau = 1000
 rho_air = 1.225
@@ -22,7 +22,7 @@ Aparachute = 0.15 # Surface parachute en m^2
 mf = 0.25  # masse fusée
 me = [1]  # masse eau
 
-print("avec une pression ajoutée de", Pajouté, "Pa,")
+
 
 ''' Les fonctions différentielles du code '''
 
@@ -51,25 +51,27 @@ def f_v_2(t, dm_dt, ve, mf, me, g, v_courant):
 '''-------------La Fonction Euler -------------------'''
 
 
-def euler(t, v, h, dm_dt, ve, mf, me, g, ):
+def euler(t, v, h, dm_dt, ve, mf, me, g,P0 ):
     v = [0]
     x = [0]
-    # for i in range(100000):
+    forces = [0] #je stock la force de poussé aussi
     while x[-1] >= 0:
-    #for i in range(10000):
-        sup = (1.5e-3) - (me[0]) / rho_eau  #
+        sup = (1.5e-3) - (me[0]) / rho_eau
         inf = (1.5e-3) - (me[-1]) / rho_eau
 
     # calcul de la pression en fonction du temps
         Pt = P0 * (sup / inf) ** 1.4
-    # temps que la masse d'eau est superieur à 0 et la
-        if me[-1] <= 0 or Pt <= Pext:
+    # temps que la masse d'eau est superieur à 0
+    # et la pression interieure est plus grande que la pression atm
+        if  me[-1] <= 0 or Pt <= Pext:
             dm_dt = 0
             ve = 0
         else:
             ve = math.sqrt((2 * (Pt - Pext) / rho_eau))  # Vitesse d'éjection de l'eau, Bernouilli
             dm_dt = -Ae * math.sqrt(2 * rho_eau * (Pt - Pext))
-        dme = f_m(t, me[-1], dm_dt)  # retourne le début massique de l'eau
+
+        current_force = -dm_dt * ve
+        dme = f_m(t, me[-1], dm_dt)  # retourne le débit massique de l'eau
         dx = f_x(t, x[-1], v[-1])  # retourne la vitesse [-1]
         if v[-1] >=0:
             # La vitesse est positive, le parachute n'est pas deployé
@@ -85,22 +87,25 @@ def euler(t, v, h, dm_dt, ve, mf, me, g, ):
     # La position suivante c'est la position d'avant + la dérivée * h
         x_next = x[-1] + dx * h
 
+    # C'est pour aussi avoir la force de poussé
+        forces.append(current_force)
     # On rajoue la nouvelle valeur à la liste x ( la position de la fusée)
         x.append(x_next)
     # On rajoue la nouvelle valeur à la liste v ( la vitesse de la fusée
         v.append(v_next)
-    # On rajoue la nouvelle valeur à la liste me ( la masse d'eau )
+    # On rajoute la nouvelle valeur à la liste me ( la masse d'eau )
         me.append(me_next)
 
 
         if x_next < 0:  # si la position est inferieur à 0, on arrête le code
             break
-    return x, v, me
+    return x, v, me, forces
 
 
 
 
 def main():
+    print("avec une pression ajoutée de", Pajouté, "Pa,")
     h_max = float((input("Entrer la hauteur max :")))  # On pose une hauteur max
     hauteur_max_absolue = []  # On créer une liste qui va determiner la hauteur max absolue finale
 
@@ -111,7 +116,7 @@ def main():
         x = [0]
         v = [0]
         me = [0.01 * i]
-        resultat_x, resultat_v, resultat_m = euler(0, v, h, dm_dt, ve, mf, me, g)
+        resultat_x, resultat_v, resultat_m, resultat_force = euler(0, v, h, dm_dt, ve, mf, me, g,P0)
         # On fait une liste avec toutes les hauteurs max pour trouver au final le max des hauteur max
         hauteur_max_absolue.append(max(resultat_x))
         if h_max - 0.3 < max(resultat_x) <= h_max + 0.3:
@@ -124,8 +129,8 @@ def main():
 
             temps = [i * h for i in range(len(resultat_x))]  # Créer la liste des temps
 
-            # Figure avec 3 sous-graphes
-            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
+            # Figure avec 4 sous-graphes (MODIFICATION ICI : 4 au lieu de 3)
+            fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 14))
 
             # Graphe 1 : Position x(t)
             ax1.plot(temps, resultat_x, 'b-', linewidth=2, label='Position x(t)')
@@ -158,6 +163,14 @@ def main():
             ax3.grid(True, alpha=0.3)
             ax3.legend(fontsize=10)
 
+            # Graphe 4 : Force d'éjection (NOUVEAU GRAPHIQUE)
+            ax4.plot(temps, resultat_force, 'purple', linewidth=2, label="Force de poussée (N)")
+            ax4.set_xlabel('Temps (s)', fontsize=11)
+            ax4.set_ylabel('Force (N)', fontsize=11)
+            ax4.set_title(f"Force d'éjection en fonction du temps", fontsize=12, fontweight='bold')
+            ax4.grid(True, alpha=0.3)
+            ax4.legend(fontsize=10)
+
             plt.tight_layout()
             plt.show()
 
@@ -168,9 +181,11 @@ def main():
 def main_2():
     Pajouté = float(input("Entrer la pression voulue (Pa) :"))
     masse = float(input("Entrer la masse d'eau initiale (en Kg):"))
+    P0 = Pajouté+Pext
     me = [masse]
 
-    resultat_x, resultat_v, resultat_m = euler(0, v, h, dm_dt, ve, mf, me, g)
+    # Correction ici pour récupérer les 4 valeurs
+    resultat_x, resultat_v, resultat_m, resultat_force = euler(0, v, h, dm_dt, ve, mf, me, g, P0)
     print("la hauteur est :",max(resultat_x))
 
 
@@ -181,5 +196,3 @@ if __name__ == "__main__":
         main()
     if x == 2:
         main_2()
-    # resultat_x, resultat_v, resultat_m = euler(0, v, h, dm_dt, ve, mf, me, g)
-    # print("Hauteur maximale atteinte :", max(resultat_x), "m")
