@@ -14,7 +14,7 @@ Ae = 0.00005  # surface de la bouche d'éjection m2
 Pt = 0  # pression qui change en fonction du temps
 dm_dt = 0  # débit massique de l'eau
 ve = 0  # equation de bernouilli
-Cd = 0.9
+Cd = 0.76
 rho_eau = 1000
 rho_air = 1.225
 Afr = (5.81e-3)  # Surface du + grd diamètre de la bouteille (m²)
@@ -165,9 +165,21 @@ def main():
     hauteur_max = max(hauteur_max_absolue)
     print("La hauteur absolue est ", hauteur_max)
 
+def main_2():
+    Pajouté = float(input("Entrer la pression voulue (Pa) :"))
+    masse = float(input("Entrer la masse d'eau initiale (en Kg):"))
+    me = [masse]
+
+    resultat_x, resultat_v, resultat_m = euler(0, v, h, dm_dt, ve, mf, me, g)
+    print("la hauteur est :",max(resultat_x))
+
+
 
 if __name__ == "__main__":
-    main()
+    x = int(input("1 pour la hauteur, 2 pour choisir la masse et la pression:"))
+    if x == 1:
+        main()
+    if x == 2:
+        main_2()
     # resultat_x, resultat_v, resultat_m = euler(0, v, h, dm_dt, ve, mf, me, g)
     # print("Hauteur maximale atteinte :", max(resultat_x), "m")
-
