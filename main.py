@@ -105,7 +105,7 @@ def euler(t, v, h, dm_dt, ve, mf, me, g,P0 ):
 
 
 def main():
-    print("avec une pression ajoutée de", Pajouté, "Pa,")
+    print("Avec une pression ajoutée de", Pajouté, "Pa,")
     h_max = float((input("Entrer la hauteur max :")))  # On pose une hauteur max
     hauteur_max_absolue = []  # On créer une liste qui va determiner la hauteur max absolue finale
 
@@ -191,8 +191,9 @@ def main_2():
 
 
 if __name__ == "__main__":
-    x = int(input("1 pour la hauteur, 2 pour choisir la masse et la pression:"))
+    x = int(input("Ecrivez 1 pour choisie la hauteur ou 2 pour choisir la masse et la pression:"))
     if x == 1:
         main()
     if x == 2:
         main_2()
+
