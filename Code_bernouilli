@@ -10,17 +10,16 @@ g = 9.81  # Accélération due à la gravité (m/s²)     # Masse initiale de la
 Pajouté = 400000  # Pression ajoutée en Pa
 Pext = 101325
 P0 = Pext + Pajouté
-Ae = 0.00005  # surface de la tuyère m2
+Ae = 0.00005  # surface de la bouche d'éjection m2
 Pt = 0  # pression qui change en fonction du temps
 dm_dt = 0  # débit massique de l'eau
 ve = 0  # vitesse d'éjection
 Cd = 0.76
 rho_eau = 1000
-rho_air = 1.227 #Air sec a température de 5°C
-Afr = (5.81e-3)  # Surface du plus grand diamètre de la fusée (m²)
-Ab = (5.81e-3) #Surface du plus grand diamètre interne de la fusée (m²)
-parachute = 0.16 # Surface parachute en m^2
-mf = 0.2  # masse fusée
+rho_air = 1.225
+Afr = (5.81e-3)  # Surface du + grd diamètre de la bouteille (m²)
+Aparachute = 0.15 # Surface parachute en m^2
+mf = 0.25  # masse fusée
 me = [1]  # masse eau
 
 
@@ -46,7 +45,7 @@ def f_v_1(t, dm_dt, ve, mf, me, g, v_courant):
 def f_v_2(t, dm_dt, ve, mf, me, g, v_courant):
 # équation de Tsiolkovski avec parachute, diamètre du parachute, force de trainée positive
     thrust = -dm_dt * ve
-    Fd = 0.5 * Cd * rho_air * (v_courant ** 2) * parachute
+    Fd = 0.5 * Cd * rho_air * (v_courant ** 2) * Aparachute
     return ((thrust + (Fd) - (mf + me) * g)) / (mf + me)
 
 '''-------------La Fonction Euler -------------------'''
@@ -68,7 +67,7 @@ def euler(t, v, h, dm_dt, ve, mf, me, g,P0 ):
             dm_dt = 0
             ve = 0
         else:
-            ve = math.sqrt((2 * (Pt - Pext) / (rho_eau*(1-(Ae/Ab)**2)))) # Vitesse d'éjection de l'eau, Bernouilli
+            ve = math.sqrt((2 * (Pt - Pext) / (rho_eau*(1-(Ae/Afr)**2)))) # Vitesse d'éjection de l'eau, Bernouilli
             dm_dt = -Ae * math.sqrt(2 * rho_eau * (Pt - Pext))
 
         current_force = -dm_dt * ve
@@ -131,46 +130,67 @@ def main():
             temps = [i * h for i in range(len(resultat_x))]  # Créer la liste des temps
 
             # Figure avec 4 sous-graphes (MODIFICATION ICI : 4 au lieu de 3)
-            fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 14))
+            fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 16))
 
-            # Graphe 1 : Position x(t)
-            ax1.plot(temps, resultat_x, 'b-', linewidth=2, label='Position x(t)')
-            ax1.axhline(y=hauteur_max, color='r', linestyle='--', linewidth=1, alpha=0.7)
-            ax1.set_xlabel('Temps (s)', fontsize=11)
-            ax1.set_ylabel('Hauteur (m)', fontsize=11)
-            ax1.set_title(f'Position en fonction du temps - Hauteur max : {hauteur_max:.2f} m', fontsize=12,
-                          fontweight='bold')
-            ax1.grid(True, alpha=0.3)
-            ax1.legend(fontsize=10)
-            ax1.axhline(y=0, color='k', linestyle='-', linewidth=0.5)
+            # --- Style global ---
+            TITLE_SIZE = 20
+            LABEL_SIZE = 16
+            TICK_SIZE = 14
+            LEGEND_SIZE = 14
+            LINE_WIDTH = 2
 
-            # Graphe 2 : Vitesse v(t)
-            ax2.plot(temps, resultat_v, 'g-', linewidth=2, label='Vitesse v(t)')
-            ax2.axhline(y=vitesse_max, color='r', linestyle='--', linewidth=1, alpha=0.7)
-            ax2.axhline(y=0, color='k', linestyle='-', linewidth=0.5)
-            ax2.set_xlabel('Temps (s)', fontsize=11)
-            ax2.set_ylabel('Vitesse (m/s)', fontsize=11)
-            ax2.set_title(f'Vitesse en fonction du temps - Vitesse max : {vitesse_max:.2f} m/s', fontsize=12,
-                          fontweight='bold')
-            ax2.grid(True, alpha=0.3)
-            ax2.legend(fontsize=10)
+            # --- Graphe 1 : Position ---
+            ax1.plot(temps, resultat_x, 'b-', linewidth=LINE_WIDTH, label='Position x(t)')
+            ax1.axhline(y=hauteur_max, color='r', linestyle='--', linewidth=1, alpha=0.8)
 
-            # Graphe 3 : Masse d'eau m(t)
-            ax3.plot(temps, resultat_m, 'orange', linewidth=2, label="Masse d'eau m(t)")
-            ax3.axhline(y=mf, color='red', linestyle='--', linewidth=1, alpha=0.7, label=f'Masse fusée sèche : {mf} kg')
-            ax3.set_xlabel('Temps (s)', fontsize=11)
-            ax3.set_ylabel('Masse (kg)', fontsize=11)
-            ax3.set_title(f"Masse d'eau en fonction du temps", fontsize=12, fontweight='bold')
-            ax3.grid(True, alpha=0.3)
-            ax3.legend(fontsize=10)
+            ax1.set_xlabel('Temps (s)', fontsize=LABEL_SIZE)
+            ax1.set_ylabel('Hauteur (m)', fontsize=LABEL_SIZE)
+            ax1.set_title(f'Position en fonction du temps\nHauteur max : {hauteur_max:.2f} m',
+                          fontsize=TITLE_SIZE, fontweight='bold')
 
-            # Graphe 4 : Force d'éjection (NOUVEAU GRAPHIQUE)
-            ax4.plot(temps, resultat_force, 'purple', linewidth=2, label="Force de poussée (N)")
-            ax4.set_xlabel('Temps (s)', fontsize=11)
-            ax4.set_ylabel('Force (N)', fontsize=11)
-            ax4.set_title(f"Force d'éjection en fonction du temps", fontsize=12, fontweight='bold')
-            ax4.grid(True, alpha=0.3)
-            ax4.legend(fontsize=10)
+            ax1.tick_params(axis='both', labelsize=TICK_SIZE)
+            ax1.grid(True, alpha=0.4)
+            ax1.legend(fontsize=LEGEND_SIZE)
+            ax1.axhline(y=0, color='k', linestyle='-', linewidth=1)
+
+            # --- Graphe 2 : Vitesse ---
+            ax2.plot(temps, resultat_v, 'g-', linewidth=LINE_WIDTH, label='Vitesse v(t)')
+            ax2.axhline(y=vitesse_max, color='r', linestyle='--', linewidth=1, alpha=0.8)
+            ax2.axhline(y=0, color='k', linestyle='-', linewidth=1)
+
+            ax2.set_xlabel('Temps (s)', fontsize=LABEL_SIZE)
+            ax2.set_ylabel('Vitesse (m/s)', fontsize=LABEL_SIZE)
+            ax2.set_title(f'Vitesse en fonction du temps\nVitesse max : {vitesse_max:.2f} m/s',
+                          fontsize=TITLE_SIZE, fontweight='bold')
+
+            ax2.tick_params(axis='both', labelsize=TICK_SIZE)
+            ax2.grid(True, alpha=0.4)
+            ax2.legend(fontsize=LEGEND_SIZE)
+
+            # --- Graphe 3 : Masse ---
+            ax3.plot(temps, resultat_m, color='orange', linewidth=LINE_WIDTH, label="Masse d'eau m(t)")
+            ax3.axhline(y=mf, color='red', linestyle='--', linewidth=2,
+                        alpha=0.8, label=f'Masse fusée sèche : {mf} kg')
+
+            ax3.set_xlabel('Temps (s)', fontsize=LABEL_SIZE)
+            ax3.set_ylabel('Masse (kg)', fontsize=LABEL_SIZE)
+            ax3.set_title("Masse d'eau en fonction du temps", fontsize=TITLE_SIZE, fontweight='bold')
+
+            ax3.tick_params(axis='both', labelsize=TICK_SIZE)
+            ax3.grid(True, alpha=0.4)
+            ax3.legend(fontsize=LEGEND_SIZE)
+
+            # --- Graphe 4 : Force d'éjection ---
+            ax4.plot(temps, resultat_force, color='purple', linewidth=LINE_WIDTH,
+                     label="Force de poussée (N)")
+
+            ax4.set_xlabel('Temps (s)', fontsize=LABEL_SIZE)
+            ax4.set_ylabel('Force (N)', fontsize=LABEL_SIZE)
+            ax4.set_title("Force d'éjection en fonction du temps", fontsize=TITLE_SIZE, fontweight='bold')
+
+            ax4.tick_params(axis='both', labelsize=TICK_SIZE)
+            ax4.grid(True, alpha=0.4)
+            ax4.legend(fontsize=LEGEND_SIZE)
 
             plt.tight_layout()
             plt.show()
