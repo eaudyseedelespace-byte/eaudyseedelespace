@@ -130,46 +130,59 @@ def main():
             temps = [i * h for i in range(len(resultat_x))]  # Créer la liste des temps
 
             # Figure avec 4 sous-graphes (MODIFICATION ICI : 4 au lieu de 3)
-            fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 14))
+            fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(13, 16))
 
-            # Graphe 1 : Position x(t)
-            ax1.plot(temps, resultat_x, 'b-', linewidth=2, label='Position x(t)')
-            ax1.axhline(y=hauteur_max, color='r', linestyle='--', linewidth=1, alpha=0.7)
-            ax1.set_xlabel('Temps (s)', fontsize=11)
-            ax1.set_ylabel('Hauteur (m)', fontsize=11)
-            ax1.set_title(f'Position en fonction du temps - Hauteur max : {hauteur_max:.2f} m', fontsize=12,
-                          fontweight='bold')
-            ax1.grid(True, alpha=0.3)
-            ax1.legend(fontsize=10)
-            ax1.axhline(y=0, color='k', linestyle='-', linewidth=0.5)
+            # --- Graphe 1 : Position x(t)
+            ax1.plot(temps, resultat_x, 'b-', linewidth=2.5, label='Position x(t)')
+            ax1.axhline(y=hauteur_max, color='r', linestyle='--', linewidth=1.2, alpha=0.7)
+            ax1.set_xlabel('Temps (s)', fontsize=16)
+            ax1.set_ylabel('Hauteur (m)', fontsize=16)
+            ax1.set_title(f'Position en fonction du temps — Hauteur max : {hauteur_max:.2f} m',
+                          fontsize=20, fontweight='bold')
+            ax1.grid(True, alpha=0.35)
+            ax1.legend(fontsize=15)
+            # graduations + cadre
+            ax1.tick_params(axis='both', labelsize=15, width=2)
+            for spine in ax1.spines.values():
+                spine.set_linewidth(1.8)
 
-            # Graphe 2 : Vitesse v(t)
-            ax2.plot(temps, resultat_v, 'g-', linewidth=2, label='Vitesse v(t)')
-            ax2.axhline(y=vitesse_max, color='r', linestyle='--', linewidth=1, alpha=0.7)
-            ax2.axhline(y=0, color='k', linestyle='-', linewidth=0.5)
-            ax2.set_xlabel('Temps (s)', fontsize=11)
-            ax2.set_ylabel('Vitesse (m/s)', fontsize=11)
-            ax2.set_title(f'Vitesse en fonction du temps - Vitesse max : {vitesse_max:.2f} m/s', fontsize=12,
-                          fontweight='bold')
-            ax2.grid(True, alpha=0.3)
-            ax2.legend(fontsize=10)
+            # --- Graphe 2 : Vitesse v(t)
+            ax2.plot(temps, resultat_v, 'g-', linewidth=2.5, label='Vitesse v(t)')
+            ax2.axhline(y=vitesse_max, color='r', linestyle='--', linewidth=1.2, alpha=0.7)
+            ax2.axhline(y=0, color='k', linestyle='-', linewidth=0.7)
+            ax2.set_xlabel('Temps (s)', fontsize=16)
+            ax2.set_ylabel('Vitesse (m/s)', fontsize=16)
+            ax2.set_title(f'Vitesse en fonction du temps — Vitesse max : {vitesse_max:.2f} m/s',
+                          fontsize=20, fontweight='bold')
+            ax2.grid(True, alpha=0.35)
+            ax2.legend(fontsize=15)
+            ax2.tick_params(axis='both', labelsize=15, width=2)
+            for spine in ax2.spines.values():
+                spine.set_linewidth(1.8)
 
-            # Graphe 3 : Masse d'eau m(t)
-            ax3.plot(temps, resultat_m, 'orange', linewidth=2, label="Masse d'eau m(t)")
-            ax3.axhline(y=mf, color='red', linestyle='--', linewidth=1, alpha=0.7, label=f'Masse fusée sèche : {mf} kg')
-            ax3.set_xlabel('Temps (s)', fontsize=11)
-            ax3.set_ylabel('Masse (kg)', fontsize=11)
-            ax3.set_title(f"Masse d'eau en fonction du temps", fontsize=12, fontweight='bold')
-            ax3.grid(True, alpha=0.3)
-            ax3.legend(fontsize=10)
+            # --- Graphe 3 : Masse d'eau m(t)
+            ax3.plot(temps, resultat_m, 'orange', linewidth=2.5, label="Masse d'eau m(t)")
+            ax3.axhline(y=mf, color='red', linestyle='--', linewidth=1.2, alpha=0.7,
+                        label=f'Masse fusée sèche : {mf} kg')
+            ax3.set_xlabel('Temps (s)', fontsize=16)
+            ax3.set_ylabel('Masse (kg)', fontsize=16)
+            ax3.set_title("Masse d'eau en fonction du temps", fontsize=20, fontweight='bold')
+            ax3.grid(True, alpha=0.35)
+            ax3.legend(fontsize=15)
+            ax3.tick_params(axis='both', labelsize=15, width=2)
+            for spine in ax3.spines.values():
+                spine.set_linewidth(1.8)
 
-            # Graphe 4 : Force d'éjection (NOUVEAU GRAPHIQUE)
-            ax4.plot(temps, resultat_force, 'purple', linewidth=2, label="Force de poussée (N)")
-            ax4.set_xlabel('Temps (s)', fontsize=11)
-            ax4.set_ylabel('Force (N)', fontsize=11)
-            ax4.set_title(f"Force d'éjection en fonction du temps", fontsize=12, fontweight='bold')
-            ax4.grid(True, alpha=0.3)
-            ax4.legend(fontsize=10)
+            # --- Graphe 4 : Force d'éjection
+            ax4.plot(temps, resultat_force, 'purple', linewidth=2.5, label="Force de poussée (N)")
+            ax4.set_xlabel('Temps (s)', fontsize=16)
+            ax4.set_ylabel('Force (N)', fontsize=16)
+            ax4.set_title("Force d'éjection en fonction du temps", fontsize=20, fontweight='bold')
+            ax4.grid(True, alpha=0.35)
+            ax4.legend(fontsize=15)
+            ax4.tick_params(axis='both', labelsize=15, width=2)
+            for spine in ax4.spines.values():
+                spine.set_linewidth(1.8)
 
             plt.tight_layout()
             plt.show()
@@ -196,4 +209,3 @@ if __name__ == "__main__":
         main()
     if x == 2:
         main_2()
-
