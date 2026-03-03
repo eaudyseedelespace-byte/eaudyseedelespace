@@ -1,0 +1,553 @@
+import matplotlib.pyplot as plt
+import math
+import numpy as np
+
+# =============================================================================
+# --- PARAMÈTRES INITIAUX ET GLOBAUX ---
+# =============================================================================
+
+h = 0.0001  # Pas de temps pour l'intégration
+v = [0]  # Liste des valeurs de vitesse
+x = [0]  # Liste des valeurs de position
+g = 9.81  # Gravité
+
+Pajouté = 500000  # Pression ajoutée en Pa (Reste par défaut en global, mais écrasée dans les fonctions)
+Pext = 101325
+P0 = Pext + Pajouté
+Ae = 0.00008  # Surface de la bouche d'éjection m2
+Pt = 0  # Pression instantanée
+dm_dt = 0  # Débit massique
+ve = 0  # Vitesse d'éjection
+Cd = 0.49  # Coefficient de trainée
+rho_eau = 1000
+rho_air = 1.227
+Afr = (5.81e-3)  # Surface bouteille
+Air_parachute = 0.15
+mf = 0.25  # Masse fusée vide
+me = [1]  # Masse eau
+k = 1  # Coefficient d'ajustement
+
+
+# =============================================================================
+# --- FONCTIONS DIFFÉRENTIELLES (PHYSIQUE DU VOL) ---
+# =============================================================================
+
+def f_x(t, x, v):
+    """
+    Équation différentielle de la position.
+
+    Parameters
+    ----------
+    t : float
+        Temps actuel de la simulation (en secondes).
+    x : float
+        Position actuelle (en mètres).
+    v : float
+        Vitesse actuelle (en m/s).
+
+    Returns
+    -------
+    float
+        La dérivée de la position par rapport au temps, qui correspond à la vitesse (en m/s).
+    """
+    return v
+
+
+def f_m(t, m, dm_dt):
+    """
+    Équation différentielle de la masse.
+
+    Parameters
+    ----------
+    t : float
+        Temps actuel de la simulation (en secondes).
+    m : float
+        Masse actuelle de l'eau dans la fusée (en kg).
+    dm_dt : float
+        Débit massique actuel (en kg/s).
+
+    Returns
+    -------
+    float
+        La dérivée de la masse par rapport au temps, qui correspond au débit massique (en kg/s).
+    """
+    return dm_dt
+
+
+def f_v_1(t, dm_dt, ve, mf, me, g, v_courant):
+    """
+    Calcule l'accélération pendant la phase de montée (sans parachute).
+
+    Applique le théorème de la résultante cinétique en prenant en compte
+    la force de poussée du moteur à eau, la force de traînée aérodynamique
+    de la bouteille, et le poids.
+
+    Parameters
+    ----------
+    t : float
+        Temps actuel de la simulation (en secondes).
+    dm_dt : float
+        Débit massique de l'eau éjectée (en kg/s).
+    ve : float
+        Vitesse d'éjection de l'eau (en m/s).
+    mf : float
+        Masse de la fusée à vide (en kg).
+    me : float
+        Masse de l'eau restante dans la fusée à l'instant t (en kg).
+    g : float
+        Accélération de la pesanteur (en m/s²).
+    v_courant : float
+        Vitesse actuelle de la fusée (en m/s).
+
+    Returns
+    -------
+    float
+        L'accélération instantanée de la fusée en phase de montée (en m/s²).
+    """
+    # Phase montée (propulsion (sans parachute))
+    thrust = k * (-dm_dt * ve)
+    Fd = 0.5 * Cd * rho_air * (v_courant ** 2) * Afr
+    return ((thrust - Fd - (mf + me) * g)) / (mf + me)
+
+
+def f_v_2(t, dm_dt, ve, mf, me, g, v_courant):
+    """
+    Calcule l'accélération pendant la phase de descente (avec parachute).
+
+    Prend en compte le déploiement du parachute (utilise Air_parachute au lieu de Afr)
+    et modifie le signe de la force de traînée (Fd) pour s'opposer à la chute.
+
+    Parameters
+    ----------
+    t : float
+        Temps actuel de la simulation (en secondes).
+    dm_dt : float
+        Débit massique de l'eau éjectée (en kg/s, 0 ici).
+    ve : float
+        Vitesse d'éjection de l'eau (en m/s, 0 ici).
+    mf : float
+        Masse de la fusée à vide (en kg).
+    me : float
+        Masse de l'eau restante dans la fusée à l'instant t (en kg).
+    g : float
+        Accélération de la pesanteur (en m/s²).
+    v_courant : float
+        Vitesse actuelle de la fusée (en m/s).
+
+    Returns
+    -------
+    float
+        L'accélération instantanée de la fusée en phase de descente (en m/s²).
+    """
+    # Phase descente (avec parachute)
+    thrust = k * (-dm_dt * ve)
+    Fd = 0.5 * Cd * rho_air * (v_courant ** 2) * Air_parachute
+    return ((thrust + Fd - (mf + me) * g)) / (mf + me)
+
+
+# =============================================================================
+# --- MOTEUR DE SIMULATION NUMÉRIQUE ---
+# =============================================================================
+
+def euler(t, v, h, dm_dt, ve, mf, me, g, P0):
+    """
+    Fonction principale de simulation utilisant la méthode d'intégration d'Euler progressive.
+
+    Simule la détente adiabatique de l'air, l'éjection de l'eau, et calcule
+    les trajectoires (position, vitesse) pas à pas jusqu'à ce que la fusée touche le sol.
+
+    Parameters
+    ----------
+    t : float
+        Temps initial (en secondes).
+    v : list
+        Liste contenant la vitesse initiale (en m/s).
+    h : float
+        Pas de temps d'intégration (en secondes).
+    dm_dt : float
+        Débit massique initial (en kg/s).
+    ve : float
+        Vitesse d'éjection initiale (en m/s).
+    mf : float
+        Masse de la fusée à vide (en kg).
+    me : list
+        Liste contenant la masse d'eau initiale (en kg).
+    g : float
+        Accélération de la pesanteur (en m/s²).
+    P0 : float
+        Pression absolue initiale (en Pa).
+
+    Returns
+    -------
+    tuple
+        Un tuple contenant quatre listes :
+        - x (list): Historique des positions (en mètres).
+        - v (list): Historique des vitesses (en m/s).
+        - me_local (list): Historique des masses d'eau (en kg).
+        - forces (list): Historique des forces de poussée (en N).
+    """
+    # Réinitialisation des listes pour la simulation locale
+    v = [0]
+    x = [0]
+    forces = [0]  # On commence avec 0 force
+
+    # Copie locale de la masse pour ne pas modifier la liste globale
+    me_local = [me[0]]
+
+    while x[-1] >= 0:
+        sup = (1.5e-3) - (me_local[0]) / rho_eau
+        inf = (1.5e-3) - (me_local[-1]) / rho_eau
+
+        # calcul de la pression adiabatique
+        if inf <= 0:
+            Pt = Pext  # Sécurité div par 0
+        else:
+            Pt = P0 * (sup / inf) ** 1.4
+
+        # Conditions d'arrêt de l'éjection
+        if me_local[-1] <= 0 or Pt <= Pext:
+            dm_dt = 0
+            ve = 0
+            current_force = 0
+        else:
+            ve = math.sqrt((2 * (Pt - Pext) / rho_eau))
+            dm_dt = -Ae * math.sqrt(2 * rho_eau * (Pt - Pext))
+            current_force = k * (-dm_dt * ve)
+
+        dme = f_m(t, me_local[-1], dm_dt)
+        dx = f_x(t, x[-1], v[-1])
+
+        if v[-1] >= 0:
+            dv = f_v_1(t, dm_dt, ve, mf, me_local[-1], g, v[-1])
+        else:
+            dv = f_v_2(t, dm_dt, ve, mf, me_local[-1], g, v[-1])
+
+        # Pas de temps d'intégration
+        me_next = me_local[-1] + dme * h
+        v_next = v[-1] + dv * h
+        x_next = x[-1] + dx * h
+
+        # Stockage
+        forces.append(current_force)
+        x.append(x_next)
+        v.append(v_next)
+        me_local.append(me_next)
+
+        if x_next < 0:
+            break
+
+    return x, v, me_local, forces
+
+
+def calculer_impulsion(forces, h):
+    """
+    Calcule l'impulsion totale générée par le moteur à eau.
+
+    Utilise l'intégration numérique (méthode des trapèzes) pour calculer
+    l'aire sous la courbe de la force en fonction du temps.
+
+    Parameters
+    ----------
+    forces : list
+        Liste des forces de poussée au cours du temps (en N).
+    h : float
+        Pas de temps d'intégration (en secondes).
+
+    Returns
+    -------
+    float
+        L'impulsion totale (en N.s).
+    """
+    if hasattr(np, 'trapezoid'):
+        return np.trapezoid(forces, dx=h)
+    else:
+        return np.trapz(forces, dx=h)
+
+
+# =============================================================================
+# --- MODES D'EXÉCUTION DU PROGRAMME ---
+# =============================================================================
+
+def main():
+    """
+    Exécute le mode 1 : Recherche de la masse d'eau idéale.
+
+    L'utilisateur saisit une pression et une hauteur cible. Le programme itère
+    sur différentes masses d'eau pour trouver celle qui permet d'atteindre
+    l'apogée souhaitée, en retenant systématiquement la plus petite quantité d'eau possible, puis affiche les résultats et les graphiques.
+
+    Returns
+    -------
+    None
+    """
+
+    Pajouté_local = float(input("Entrer la pression ajoutée voulue (en Pa) : "))
+    P0_local = Pajouté_local + Pext
+    print(f"Avec une pression ajoutée de {Pajouté_local} Pa,")
+
+    # Note: float input converti
+    h_max = float((input("Entrer la hauteur voulue : ")))
+    hauteur_max_absolue = []
+
+    # On cherche la masse idéale
+    for i in range(1, 150):
+        me_simu = [0.01 * i]  # Masse test (0.01kg)
+        resultat_x, resultat_v, resultat_m, resultat_force = euler(0, v, h, dm_dt, ve, mf, me_simu, g, P0_local)
+
+        hauteur_atteinte = max(resultat_x)
+        hauteur_max_absolue.append(hauteur_atteinte)
+
+        # Si on est proche de la hauteur cible (+/- 30cm)
+        if h_max - 0.3 < hauteur_atteinte <= h_max + 0.3:
+            # --- CALCULS PHYSIQUES ---
+            impulsion_totale = calculer_impulsion(resultat_force, h)
+
+            # Calcul du temps de poussée
+            nb_points_poussee = sum(1 for f in resultat_force if f > 0)
+            duree_poussee = nb_points_poussee * h
+
+            # Calcul du temps de vol et Apogée
+            temps = [j * h for j in range(len(resultat_x))]
+            temps_vol_total = temps[-1]  # Dernier temps enregistré
+
+            # Recherche de l'apogée
+            index_apogee = resultat_x.index(hauteur_atteinte)
+            temps_apogee = index_apogee * h
+
+            print("-" * 30)
+            print(f"Hauteur atteinte : {hauteur_atteinte:.2f} m")
+            print(f"Masse d'eau idéale : {me_simu[0]:.2f} kg")
+            print(f"TEMPS À L'APOGÉE : {temps_apogee:.2f} s")
+            print(f"TEMPS DE VOL TOTAL : {temps_vol_total:.2f} s")
+            print(f"IMPULSION TOTALE : {impulsion_totale:.4f} N.s")
+            print(f"DURÉE POUSSÉE   : {duree_poussee:.4f} s")
+            print("-" * 30)
+
+            hauteur_max = hauteur_atteinte
+            vitesse_max = max(resultat_v)
+
+            # --- Affichage Graphique ---
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
+
+            # 1. Position (Reste sur le temps total)
+            ax1.plot(temps, resultat_x, 'b')
+            ax1.set_ylabel('Hauteur (m)')
+            ax1.set_title(f'Position (Max: {hauteur_max:.2f} m)')
+            ax1.grid(True)
+
+            # 2. Vitesse (Reste sur le temps total)
+            ax2.plot(temps, resultat_v, 'g')
+            ax2.set_ylabel('Vitesse (m/s)')
+            ax2.set_title(f'Vitesse (Max: {vitesse_max:.2f} m/s)')
+            ax2.grid(True)
+
+            # 3. Force (ZOOMÉ)
+            ax3.plot(temps, resultat_force, 'purple')
+            ax3.fill_between(temps, resultat_force, color='purple', alpha=0.2)
+            ax3.set_xlabel('Temps (s)')
+            ax3.set_ylabel('Force (N)')
+            ax3.set_title(f"Poussée — Impulsion: {impulsion_totale:.2f} N.s | Durée: {duree_poussee:.3f} s")
+            ax3.grid(True)
+            ax3.set_xlim(0, duree_poussee * 1.2)
+
+            plt.tight_layout()
+            plt.show()
+
+            break
+
+    print("La hauteur absolue max possible avec ces paramètres est ", max(hauteur_max_absolue))
+
+
+def main_2():
+    """
+    Exécute le mode 2 : Simulation libre de vol.
+
+    L'utilisateur définit manuellement la pression ajoutée et la masse d'eau.
+    Le programme calcule et affiche les performances de ce vol spécifique
+    dans la console et trace les graphiques correspondants.
+
+    Returns
+    -------
+    None
+    """
+    Pajouté = float(input("Entrer la pression voulue (Pa) :"))
+    masse = float(input("Entrer la masse d'eau initiale (en Kg):"))
+    P0_local = Pajouté + Pext
+    me_init = [masse]
+
+    resultat_x, resultat_v, resultat_m, resultat_force = euler(0, v, h, dm_dt, ve, mf, me_init, g, P0_local)
+
+    # --- CALCULS ---
+    impulsion_totale = calculer_impulsion(resultat_force, h)
+    nb_points_poussee = sum(1 for f in resultat_force if f > 0)
+    duree_poussee = nb_points_poussee * h
+
+    # Calcul du temps de vol et Apogée
+    hauteur_max = max(resultat_x)
+    vitesse_max = max(resultat_v)
+
+    # Calcul Apogée
+    index_apogee = resultat_x.index(hauteur_max)
+    temps_apogee = index_apogee * h
+
+    # Calcul Temps total
+    temps_vol_total = (len(resultat_x) - 1) * h
+    temps = [j * h for j in range(len(resultat_x))]
+
+    print("-" * 30)
+    print(f"Hauteur atteinte : {hauteur_max:.2f} m")
+    print(f"TEMPS À L'APOGÉE : {temps_apogee:.2f} s")
+    print(f"TEMPS DE VOL TOTAL : {temps_vol_total:.2f} s")
+    print(f"IMPULSION TOTALE : {impulsion_totale:.4f} N.s")
+    print(f"DURÉE POUSSÉE   : {duree_poussee:.4f} s")
+    print("-" * 30)
+
+    # --- Affichage Graphique ---
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
+
+    ax1.plot(temps, resultat_x, 'b')
+    ax1.set_ylabel('Hauteur (m)')
+    ax1.set_title(f'Position (Max: {hauteur_max:.2f} m)')
+    ax1.grid(True)
+
+    ax2.plot(temps, resultat_v, 'g')
+    ax2.set_ylabel('Vitesse (m/s)')
+    ax2.set_title(f'Vitesse (Max: {vitesse_max:.2f} m/s)')
+    ax2.grid(True)
+
+    ax3.plot(temps, resultat_force, 'purple')
+    ax3.fill_between(temps, resultat_force, color='purple', alpha=0.2)
+    ax3.set_xlabel('Temps (s)')
+    ax3.set_ylabel('Force (N)')
+    ax3.set_title(f"Poussée — Impulsion: {impulsion_totale:.2f} N.s | Durée: {duree_poussee:.3f} s")
+    ax3.grid(True)
+    ax3.set_xlim(0, duree_poussee * 1.2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def main_3():
+    """
+    Exécute le mode 3 : Recherche de la pression requise.
+
+    L'utilisateur fixe une hauteur cible et une masse d'eau. Le programme
+    utilise un algorithme de dichotomie pour converger vers la pression exacte
+    nécessaire pour atteindre l'apogée, puis trace les graphiques de vol.
+
+    Returns
+    -------
+    None
+    """
+    print("\n--- RECHERCHE DE LA PRESSION REQUISE ---")
+    h_cible = float(input("Entrez la hauteur cible voulue (en m) : "))
+    masse_eau = float(input("Entrez la masse d'eau fixée (en kg, ex: 0.5 pour 1/3 d'une bouteille de 1.5L) : "))
+
+    # Limites de la recherche par dichotomie (en pression ajoutée, Pa)
+    P_min = 1000.0  # Pression très faible (0.01 bar)
+    P_max = 500000.0  # Limite structurelle haute (5 bar)
+    tolerance = 0.05  # On accepte une erreur de 5 cm sur l'apogée
+    max_iter = 50  # Sécurité pour éviter une boucle infinie
+
+    P_opti = 0
+    me_init = [masse_eau]
+
+    print("Calcul en cours (algorithme de dichotomie)...")
+
+    for i in range(max_iter):
+        P_test = (P_min + P_max) / 2.0
+        P0_test = P_test + Pext
+
+        # Lancement de la simulation avec la pression testée
+        # Les variables bidons (v, dm_dt, ve) sont écrasées dans ta fonction euler, pas d'inquiétude
+        resultat_x, resultat_v, resultat_m, resultat_force = euler(0, v, h, dm_dt, ve, mf, me_init, g, P0_test)
+
+        hauteur_max_test = max(resultat_x)
+
+        # Vérification si on est dans la zone de tolérance
+        if abs(hauteur_max_test - h_cible) <= tolerance:
+            P_opti = P_test
+            break
+        elif hauteur_max_test < h_cible:
+            P_min = P_test  # Pas assez haut, on augmente la limite basse
+        else:
+            P_max = P_test  # Trop haut, on abaisse la limite haute
+
+        P_opti = P_test  # Sauvegarde en cas de sortie par max_iter
+
+    # --- SIMULATION FINALE AVEC LA PRESSION TROUVÉE ---
+    P0_opti = P_opti + Pext
+    resultat_x, resultat_v, resultat_m, resultat_force = euler(0, v, h, dm_dt, ve, mf, me_init, g, P0_opti)
+
+    hauteur_max = max(resultat_x)
+    vitesse_max = max(resultat_v)
+    impulsion_totale = calculer_impulsion(resultat_force, h)
+    nb_points_poussee = sum(1 for f in resultat_force if f > 0)
+    duree_poussee = nb_points_poussee * h
+
+    temps = [j * h for j in range(len(resultat_x))]
+    temps_vol_total = temps[-1]
+    index_apogee = resultat_x.index(hauteur_max)
+    temps_apogee = index_apogee * h
+
+    print("-" * 40)
+    print(f"✅ RÉSULTAT CONVERGÉ (en {i + 1} itérations)")
+    print("-" * 40)
+    print(f"Cible demandée : {h_cible:.2f} m")
+    print(f"Apogée simulée : {hauteur_max:.2f} m")
+    print(f"Masse d'eau    : {masse_eau:.2f} kg")
+    print(f"👉 PRESSION RELATIVE REQUISE : {P_opti:.0f} Pa ({P_opti / 100000:.2f} bars)")
+    print("-" * 40)
+    print(f"TEMPS À L'APOGÉE   : {temps_apogee:.2f} s")
+    print(f"TEMPS DE VOL TOTAL : {temps_vol_total:.2f} s")
+    print(f"IMPULSION TOTALE   : {impulsion_totale:.4f} N.s")
+    print(f"DURÉE POUSSÉE      : {duree_poussee:.4f} s")
+    print("-" * 40)
+
+    # --- Affichage Graphique identique au main 1 ---
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
+
+    ax1.plot(temps, resultat_x, 'b')
+    ax1.set_ylabel('Hauteur (m)')
+    ax1.set_title(f'Position (Max: {hauteur_max:.2f} m)')
+    ax1.grid(True)
+
+    ax2.plot(temps, resultat_v, 'g')
+    ax2.set_ylabel('Vitesse (m/s)')
+    ax2.set_title(f'Vitesse (Max: {vitesse_max:.2f} m/s)')
+    ax2.grid(True)
+
+    ax3.plot(temps, resultat_force, 'purple')
+    ax3.fill_between(temps, resultat_force, color='purple', alpha=0.2)
+    ax3.set_xlabel('Temps (s)')
+    ax3.set_ylabel('Force (N)')
+    ax3.set_title(f"Poussée — Impulsion: {impulsion_totale:.2f} N.s | Durée: {duree_poussee:.3f} s")
+    ax3.grid(True)
+    ax3.set_xlim(0, duree_poussee * 1.2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# =============================================================================
+# --- LANCEMENT DU SCRIPT ---
+# =============================================================================
+
+if __name__ == "__main__":
+    print("1 : Trouver la masse d'eau idéale pour une hauteur et pression données")
+    print("2 : Simuler le vol avec une masse et pression définies")
+    print("3 : Trouver la PRESSION REQUISE pour une hauteur et masse d'eau fixées")
+    choix = int(input("\nTapez votre choix (1, 2 ou 3) : "))
+
+    if choix == 1:
+        main()
+    elif choix == 2:
+        main_2()
+    elif choix == 3:
+        main_3()
+    else:
+        print("Choix invalide.")
+
+
+
+
