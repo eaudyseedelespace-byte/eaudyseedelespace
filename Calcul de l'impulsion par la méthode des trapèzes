@@ -1,0 +1,47 @@
+"""
+Script de post-traitement des données du banc d'essai propulsif.
+Calcule l'impulsion totale (N.s) par intégration numérique (méthode des trapèzes)
+à partir d'un profil de force brute en fonction du temps.
+"""
+
+import numpy as np
+
+# 1. Données brutes issues de l'acquisition
+# Format attendu : Temps (s) \t Force (N)
+# Note : Les décimales utilisent la typographie française (virgules).
+donnees_brutes = """
+0,000	85,377
+0,001	52,923
+0,002	24,191
+0,003	10,152
+0,004	1,662
+
+
+"""
+
+# Initialisation des vecteurs d'état
+t = []  # Vecteur temps (en secondes)
+force = []  # Vecteur force de poussée (en Newtons)
+
+# 2. Nettoyage et extraction (Parsing)
+# On retire les sauts de ligne inutiles au début/fin, puis on itère ligne par ligne
+for ligne in donnees_brutes.strip().split('\n'):
+
+    # Conversion de la virgule décimale française vers le point standard informatique
+    ligne_formatee = ligne.replace(',', '.')
+    colonnes = ligne_formatee.split()
+
+    # Sécurité : on s'assure que la ligne contient bien au moins deux valeurs
+    # avant d'extraire les coordonnées temporelles et dynamiques
+    if len(colonnes) >= 2:
+        t.append(float(colonnes[0]))
+        force.append(float(colonnes[1]))
+
+# 3. Calcul analytique
+# L'impulsion totale correspond à l'intégrale de la force par rapport au temps.
+# L'intégration numérique est réalisée via la méthode des trapèzes de Numpy.
+impulsion = np.trapezoid(force, x=t)
+
+# 4. Affichage du résultat
+# Formatage à 5 décimales pour refléter la précision du pas de temps
+print(f"Impulsion totale : {impulsion:.5f} N.s")
